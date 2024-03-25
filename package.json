@@ -33,6 +33,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "build-watch": "tsc -w",
     "test": "jest ${1}",
     "coveralls": "jest --coverage && cat ./coverage/lcov.info | coveralls",
     "lint": "eslint . --ext .ts --cache",
@@ -97,6 +98,11 @@
     "manual-git-changelog": "^1.0.1",
     "streamify-array": "^1.0.1",
     "ts-jest": "^26.4.3",
-    "typescript": "^4.2.4"
+    "typescript": "^4.2.4",
+    "is-stream": "^2.0.0",
+    "readable-stream-node-to-web": "^1.0.0",
+    "streamify-string": "^1.0.0",
+    "@bergos/jsonparse": "^1.4.1",
+    "optimal-traversal-metric": "https://github.com/RubenEschauzier/metric-link-prioritisation-performance"
   }
 }

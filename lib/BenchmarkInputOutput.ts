@@ -39,13 +39,15 @@ export async function writeBenchmarkResults(
   metadataKeys: string[] = [],
 ): Promise<void> {
   const out = fs.createWriteStream(outputFile);
-  out.write(`name;id;results;time;error${timestampsRecording ? ';timestamps' : ''}${metadataKeys.length > 0 ? `;${metadataKeys.join(';')}` : ''}\n`);
+  out.write(`name;id;results;time;error${timestampsRecording ? ';timestamps' : ''};metrics${metadataKeys.length > 0 ? `;${metadataKeys.join(';')}` : ''}\n`);
   for (const key in results) {
-    const { name, id, count, time, error, timestamps, metadata } = results[key];
+    const { name, id, count, time, error, timestamps, metricsCalculated, metadata } = results[key];
     out.write(`${name};${id};${count};${time};${error}${
       timestampsRecording ?
         `;${timestamps.join(' ')}` :
-        ''}${
+        ''}
+      ;${metricsCalculated.join(' ')}  
+        ${
       metadataKeys.length > 0 ?
         `;${metadataKeys.map(metadataKey => metadata[metadataKey]).join(';')}` :
         ''}\n`);

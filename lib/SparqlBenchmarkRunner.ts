@@ -1,6 +1,7 @@
 import { SparqlEndpointFetcher } from 'fetch-sparql-endpoint';
 import type { IBenchmarkResults } from './IBenchmarkResults';
-
+import { SparqlJsonParser } from 'sparqljson-parse';
+import { CalculateOptimalTraversalMetric, ITraversalTopology } from './CalculateOptimalTraversalMetric';
 /**
  * Executes query sets against a SPARQL endpoint.
  */
@@ -15,6 +16,7 @@ export class SparqlBenchmarkRunner {
   private readonly additionalUrlParamsInit?: URLSearchParams;
   private readonly additionalUrlParamsRun?: URLSearchParams;
   private readonly timeout?: number;
+  private readonly optimalTraversalMetric: CalculateOptimalTraversalMetric;
 
   public constructor(options: ISparqlBenchmarkRunnerArgs) {
     this.endpoint = options.endpoint;
@@ -27,6 +29,7 @@ export class SparqlBenchmarkRunner {
     this.additionalUrlParamsInit = options.additionalUrlParamsInit;
     this.additionalUrlParamsRun = options.additionalUrlParamsRun;
     this.timeout = options.timeout;
+    this.optimalTraversalMetric = new CalculateOptimalTraversalMetric();
   }
 
   /**
@@ -79,27 +82,55 @@ export class SparqlBenchmarkRunner {
           let count: number;
           let time: number;
           let timestamps: number[];
+          let trackedTopology: ITraversalTopology;
+          let contributingDocuments: string[][];
           let metadata: Record<string, any>;
           let errorObject: Error | undefined;
 
           // Execute query, and catch errors
           try {
-            ({ count, time, timestamps, metadata } = await this.executeQuery(query));
+            ({ count, time, timestamps, trackedTopology, contributingDocuments, metadata } = await this.executeQuery(query));
           } catch (error: unknown) {
             errorObject = <Error> error;
             if ('partialOutput' in <any> errorObject) {
-              ({ count, time, timestamps, metadata } = (<any>errorObject).partialOutput);
+              ({ count, time, timestamps, trackedTopology, contributingDocuments, metadata } = (<any>errorObject).partialOutput);
             } else {
               count = 0;
               time = 0;
               timestamps = [];
+              trackedTopology =  {
+                nodeToIndex: {},
+                edgeListUnWeighted: [], edgeListDocumentSize: [], edgeListRequestTime: [],
+                edgesInGraph: {},
+                metadataNode: [],
+                traversalOrder: [],
+                traversalOrderEdges: []
+              };
+              contributingDocuments = [];
               metadata = {};
             }
           }
+          console.log(timestamps)
 
           // Store results
+          // Here we should calculate the metric and store it too, note that the check data[name+id] is for averaging execution times
+          // So we don't need it!,
+          // Also consider putting a timeout on metric calculation so we are not stuck calculating for too long
+          // Only need slight adjustment for result writing, as we simply add a few fields!!
+          // Now to find out how to make github as dependency
+          const metricsCalculated = [];
+          if (count > 0){
+            metricsCalculated.push(await this.optimalTraversalMetric.calculateMetricAllResults(trackedTopology, contributingDocuments, "unweighted"));
+            const metricsFirstK = await this.optimalTraversalMetric.calculateMetricFirstKResults([1,2,4], trackedTopology, contributingDocuments,
+              "unweighted", "reduced");
+            metricsCalculated.push(...metricsFirstK);
+          }
+          else{
+            // We can't calculate metric when no results are found, so we just put -1 (in the ugliest way possible)
+            metricsCalculated.push(...[-1,-1,-1,-1]);
+          }
           if (!data[name + id]) {
-            data[name + id] = { name, id, count, time, timestamps, error: Boolean(errorObject), metadata };
+            data[name + id] = { name, id, count, time, timestamps, error: Boolean(errorObject), metricsCalculated, metadata };
           } else {
             const dataEntry = data[name + id];
 
@@ -124,6 +155,7 @@ export class SparqlBenchmarkRunner {
             await this.sleep(3_000);
             await this.waitUntilUp();
           }
+          await this.sleep(5_000);
         }
       }
     }
@@ -135,7 +167,8 @@ export class SparqlBenchmarkRunner {
    * @param query A SPARQL query string
    */
   public async executeQuery(query: string): Promise<{
-    count: number; time: number; timestamps: number[]; metadata: Record<string, any>;
+    count: number; time: number; timestamps: number[]; 
+    trackedTopology: ITraversalTopology; contributingDocuments: string[][]; metadata: Record<string, any>;
   }> {
     const fetcher = new SparqlEndpointFetcher({
       additionalUrlParams: this.additionalUrlParamsRun,
@@ -147,18 +180,42 @@ export class SparqlBenchmarkRunner {
         timeoutHandle = <any> setTimeout(() => reject(new Error('Timeout for running query')), this.timeout);
       });
     }
+    // TODO Change the output of the sparql-benchmark-runner
+    // TODO Add metric to npm
+    // TODO Use the metric calculation in sparql-benchmark-runner
+    // Publish version of runner that uses the metric to alternative JBR package to npm
+    // Run the benchmark runner testing code: from /temp-run-sparql-benchmark
+    // node ../sparql-benchmark-runner-topology/bin/sparql-benchmark-runner.js -e http://localhost:3001/sparql -q queries/ --output output.csv --replication 1 --warmup 0
+    // Run the sparql endpoint: from root comunica:
+    // node engines/query-sparql-link-traversal-solid/bin/http.js --lenient --idp void --context '{"sources":[]}' --port 3001 --returnTopology true
+    // sparql-benchmark-runner: "username/repistory#commitid" to match github version of forked sparql-benchmark-runner
+    // start endpoint: node engines/query-sparql-link-traversal-solid/bin/http.js --lenient --idp void --context '{"sources":[], "unionDefaultGraph": true, "@comunica/bus-rdf-resolve-hypermedia-links:annotateSources": "graph"}' --port 3001 --returnTopology true -t 60 -i true
+    // END OWN CODE
     const promiseFetch = fetcher.fetchBindings(this.endpoint, query)
       .then(results => new Promise<{
-        count: number; time: number; timestamps: number[]; metadata: Record<string, any>;
+        count: number; time: number; timestamps: number[]; trackedTopology: ITraversalTopology, contributingDocuments: string[][], metadata: Record<string, any>;
       }>((resolve, reject) => {
-        const hrstart = process.hrtime();
+        let trackedTopology: ITraversalTopology = {
+          nodeToIndex: {},
+          edgeListUnWeighted: [], edgeListDocumentSize: [], edgeListRequestTime: [],
+          edgesInGraph: {},
+          metadataNode: [],
+          traversalOrder: [],
+          traversalOrderEdges: []
+        };
+        const contributingDocuments: string[][] = [];
         let count = 0;
+        const hrstart = process.hrtime();
         const timestamps: number[] = [];
         let metadata: Record<string, any> = {};
         results.on('metadata', (readMetadata: any) => {
           metadata = readMetadata;
         });
-        results.on('data', () => {
+        results.on('data', (data) => {
+          // We retrieve the binding for the topology object here
+          trackedTopology = JSON.parse(data._trackedTopology.value);
+          // Retrieve binding for contributing documents here
+          contributingDocuments.push(JSON.parse(data._sourceAttribution.value));
           count++;
           if (this.timestampsRecording) {
             timestamps.push(this.countTime(hrstart));
@@ -177,7 +234,8 @@ export class SparqlBenchmarkRunner {
           if (timeoutHandle) {
             clearTimeout(timeoutHandle);
           }
-          resolve({ count, time: this.countTime(hrstart), timestamps, metadata });
+          resolve({ count, time: this.countTime(hrstart), timestamps, 
+            trackedTopology, contributingDocuments, metadata });
         });
       }));
     return promiseTimeout ? Promise.race([ promiseTimeout, promiseFetch ]) : promiseFetch;
@@ -203,6 +261,8 @@ export class SparqlBenchmarkRunner {
     const promiseTimeout = new Promise<boolean>(resolve => {
       timeoutHandle = <any> setTimeout(() => resolve(false), 10_000);
     });
+    // Change promisefetch to raw stream to reflect changes in type of output of query
+
     const promiseFetch = fetcher.fetchBindings(this.endpoint, this.upQuery)
       .then(results => new Promise<boolean>(resolve => {
         results.on('error', () => {
@@ -216,7 +276,22 @@ export class SparqlBenchmarkRunner {
           clearTimeout(timeoutHandle);
           resolve(true);
         });
-      }));
+    }));
+
+    // const promiseFetch = fetcher.fetchBindings(this.endpoint, this.upQuery)
+    //   .then(results => new Promise<boolean>(resolve => {
+    //     results.on('error', () => {
+    //       clearTimeout(timeoutHandle);
+    //       resolve(false);
+    //     });
+    //     results.on('data', () => {
+    //       // Do nothing
+    //     });
+    //     results.on('end', () => {
+    //       clearTimeout(timeoutHandle);
+    //       resolve(true);
+    //     });
+    //   }));
     return Promise.race([ promiseTimeout, promiseFetch ])
       .catch(() => false);
   }
@@ -231,6 +306,7 @@ export class SparqlBenchmarkRunner {
       this.log(`\rEndpoint not available yet, waited for ${++counter} seconds...`);
     }
     this.log(`\rEndpoint available after ${counter} seconds.\n`);
+    await this.sleep(5_000);
   }
 
   /**

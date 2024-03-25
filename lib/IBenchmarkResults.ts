@@ -13,6 +13,7 @@ export interface IBenchmarkResult {
   count: number;
   time: number;
   timestamps: number[];
+  metricsCalculated: number[];
   error: boolean;
   metadata: Record<string, any>;
 }
