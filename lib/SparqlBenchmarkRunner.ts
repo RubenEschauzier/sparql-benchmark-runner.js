@@ -110,7 +110,6 @@ export class SparqlBenchmarkRunner {
               metadata = {};
             }
           }
-          console.log(timestamps)
 
           // Store results
           // Here we should calculate the metric and store it too, note that the check data[name+id] is for averaging execution times
@@ -121,8 +120,16 @@ export class SparqlBenchmarkRunner {
           const metricsCalculated = [];
           if (count > 0){
             metricsCalculated.push(await this.optimalTraversalMetric.calculateMetricAllResults(trackedTopology, contributingDocuments, "unweighted"));
-            const metricsFirstK = await this.optimalTraversalMetric.calculateMetricFirstKResults([1,2,4], trackedTopology, contributingDocuments,
-              "unweighted", "reduced");
+            const metricsFirstK = await this.optimalTraversalMetric.calculateMetricFirstKResults(
+              [1,2,4], 
+              trackedTopology, 
+              contributingDocuments,
+              "unweighted", "full", 
+              undefined, 
+              5_000, 
+              true, 
+              1_000_000
+            );
             metricsCalculated.push(...metricsFirstK);
           }
           else{
@@ -189,7 +196,7 @@ export class SparqlBenchmarkRunner {
     // Run the sparql endpoint: from root comunica:
     // node engines/query-sparql-link-traversal-solid/bin/http.js --lenient --idp void --context '{"sources":[]}' --port 3001 --returnTopology true
     // sparql-benchmark-runner: "username/repistory#commitid" to match github version of forked sparql-benchmark-runner
-    // start endpoint: node engines/query-sparql-link-traversal-solid/bin/http.js --lenient --idp void --context '{"sources":[], "unionDefaultGraph": true, "@comunica/bus-rdf-resolve-hypermedia-links:annotateSources": "graph"}' --port 3001 --returnTopology true -t 60 -i true
+    // start endpoint: node engines/query-sparql-link-traversal-solid/bin/http.js --lenient --idp void --context '{"sources":[], "unionDefaultGraph": true, "@comunica/bus-rdf-resolve-hypermedia-links:annotateSources": "graph"}' --port 3001 --returnTopology true -t 60 -i true --freshWorker true
     // END OWN CODE
     const promiseFetch = fetcher.fetchBindings(this.endpoint, query)
       .then(results => new Promise<{

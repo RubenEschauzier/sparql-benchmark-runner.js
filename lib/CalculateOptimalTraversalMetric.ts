@@ -72,9 +72,17 @@ export class CalculateOptimalTraversalMetric{
       return await this.calculateMetricAll(metricInput);
   }
 
-  public async calculateMetricFirstKResults(kToCheck: number[], 
-    topology: ITraversalTopology, contributingDocuments: string[][], 
-    metricType: topologyType, searchType: searchType): Promise<number[]>
+  public async calculateMetricFirstKResults(
+    kToCheck: number[], 
+    topology: ITraversalTopology, 
+    contributingDocuments: string[][], 
+    metricType: topologyType, 
+    searchType: searchType,
+    solverInputFileLocation?: string,
+    batchSize?: number,
+    allowRandomSampling?: boolean,
+    numberSamples?: number,
+  ): Promise<number[]>
   {
     const metricInput: IMetricInput = this.prepareMetricInput(
         topology, 
@@ -84,7 +92,15 @@ export class CalculateOptimalTraversalMetric{
     const metricsFirstK: number[] = [];
     for (const k of kToCheck){
         if (metricInput.contributingNodes.length > k){
-          metricsFirstK.push(await this.calculateMetricFirstK(metricInput, k, searchType));
+          metricsFirstK.push(await this.calculateMetricFirstK(
+            metricInput, 
+            k, 
+            searchType, 
+            solverInputFileLocation, 
+            batchSize, 
+            allowRandomSampling, 
+            numberSamples
+          ));
         }
         else{
           metricsFirstK.push(-1);
@@ -104,7 +120,15 @@ export class CalculateOptimalTraversalMetric{
     return metricAll;
   }
 
-  private async calculateMetricFirstK(metricInput: IMetricInput, k: number, searchType: searchType){
+  private async calculateMetricFirstK(
+    metricInput: IMetricInput, 
+    k: number, 
+    searchType: searchType, 
+    solverInputFileLocation?: string,
+    batchSize?: number, 
+    allowRandomSampling?: boolean,
+    numberSamples?: number
+    ){
     const metricFirstK = await this.metric.runMetricFirstK(
       k,
       metricInput.edgeList, 
@@ -112,7 +136,11 @@ export class CalculateOptimalTraversalMetric{
       metricInput.traversedPath, 
       metricInput.roots,
       metricInput.numNodes,
-      searchType
+      searchType,
+      solverInputFileLocation,
+      batchSize,
+      allowRandomSampling,
+      numberSamples
     );
     return metricFirstK
   }
