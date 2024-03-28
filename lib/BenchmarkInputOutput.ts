@@ -48,9 +48,9 @@ export async function writeBenchmarkResults(
         ''}
       ;${metricsCalculated.join(' ')}  
         ${
-      metadataKeys.length > 0 ?
-        `;${metadataKeys.map(metadataKey => metadata[metadataKey]).join(';')}` :
-        ''}\n`);
+  metadataKeys.length > 0 ?
+    `;${metadataKeys.map(metadataKey => metadata[metadataKey]).join(';')}` :
+    ''}\n`);
   }
   out.end();
 }
