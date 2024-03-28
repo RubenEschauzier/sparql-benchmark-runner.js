@@ -111,14 +111,9 @@ export class SparqlBenchmarkRunner {
             }
           }
 
-          // Store results
-          // Here we should calculate the metric and store it too, note that the check data[name+id] is for averaging execution times
-          // So we don't need it!,
-          // Also consider putting a timeout on metric calculation so we are not stuck calculating for too long
-          // Only need slight adjustment for result writing, as we simply add a few fields!!
-          // Now to find out how to make github as dependency
+          // Calculate the metric if we obtain the required data
           const metricsCalculated = [];
-          if (count > 0){
+          if (count > 0 && contributingDocuments.length > 0){
             metricsCalculated.push(await this.optimalTraversalMetric.calculateMetricAllResults(trackedTopology, contributingDocuments, "unweighted"));
             const metricsFirstK = await this.optimalTraversalMetric.calculateMetricFirstKResults(
               [1,2,4], 
@@ -220,9 +215,11 @@ export class SparqlBenchmarkRunner {
         });
         results.on('data', (data) => {
           // We retrieve the binding for the topology object here
-          trackedTopology = JSON.parse(data._trackedTopology.value);
-          // Retrieve binding for contributing documents here
-          contributingDocuments.push(JSON.parse(data._sourceAttribution.value));
+          if (data._trackedTopology){
+            trackedTopology = JSON.parse(data._trackedTopology.value);
+            // Retrieve binding for contributing documents here
+            contributingDocuments.push(JSON.parse(data._sourceAttribution.value));  
+          }
           count++;
           if (this.timestampsRecording) {
             timestamps.push(this.countTime(hrstart));
