@@ -1,6 +1,6 @@
 {
   "name": "sparql-benchmark-runner",
-  "version": "2.9.4",
+  "version": "2.9.5",
   "description": "Executes a query set against a given SPARQL endpoint",
   "repository": "https://github.com/comunica/sparql-benchmark-runner.js",
   "keywords": [
@@ -37,7 +37,8 @@
     "test": "jest ${1}",
     "coveralls": "jest --coverage && cat ./coverage/lcov.info | coveralls",
     "lint": "eslint . --ext .ts --cache",
-    "prepare": "npm run build",
+    "prepare": "yarn run build",
+    "prepack": "yarn run build",
     "version": "manual-git-changelog onversion"
   },
   "husky": {
