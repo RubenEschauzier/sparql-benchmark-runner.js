@@ -40,6 +40,8 @@ export class SparqlBenchmarkRunner {
    */
   public async run(options: IRunOptions = {}): Promise<IBenchmarkResults> {
     // Await query execution until the endpoint is live
+    console.log("Waiting untill up")
+    console.log(this.endpoint)
     await this.waitUntilUp();
 
     // Execute queries in warmup
