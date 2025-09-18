@@ -2,7 +2,7 @@ import { createHash, type Hash } from 'node:crypto';
 import type * as RDF from '@rdfjs/types';
 import { SparqlEndpointFetcher } from 'fetch-sparql-endpoint';
 import { termToString } from 'rdf-string';
-import type { IResult, IResultMetadata, IAggregateResult } from './Result';
+import type { IResult, IResultMetadata, IRunResult } from './Result';
 import type { IResultAggregator } from './ResultAggregator';
 import { ResultAggregatorComunica } from './ResultAggregatorComunica';
 
@@ -17,6 +17,7 @@ export class SparqlBenchmarkRunner {
   protected readonly replication: number;
   protected readonly warmup: number;
   protected readonly querySets: Record<string, string[]>;
+  protected readonly querySetsMetadata?: Record<string, Record<string, any>>;
   protected readonly bindingsHashAlgorithm: string;
   protected readonly logger?: (message: string) => void;
   protected readonly resultAggregator: IResultAggregator;
@@ -29,6 +30,7 @@ export class SparqlBenchmarkRunner {
     this.endpoint = options.endpoint;
     this.endpointUpCheck = options.endpointUpCheck ?? options.endpoint;
     this.querySets = options.querySets;
+    this.querySetsMetadata = options.querySetsMetadata;
     this.replication = options.replication;
     this.warmup = options.warmup;
     this.timeout = options.timeout;
@@ -46,7 +48,7 @@ export class SparqlBenchmarkRunner {
    * execute all query sets against the SPARQL endpoint.
    * Afterwards, all results are collected and averaged.
    */
-  public async run(options: IRunOptions = {}): Promise<IAggregateResult[]> {
+  public async run(options: IRunOptions = {}): Promise<IRunResult> {
     // Execute queries in warmup
     if (this.warmup > 0) {
       await this.executeAllQueries(this.warmup, true, options.onQuery);
@@ -65,7 +67,10 @@ export class SparqlBenchmarkRunner {
 
     const aggregateResults = this.resultAggregator.aggregateResults(results);
 
-    return aggregateResults;
+    return {
+      aggregateResults,
+      rawResults: results,
+    };
   }
 
   /**
@@ -73,7 +78,7 @@ export class SparqlBenchmarkRunner {
    * @param replication The number of executions per individual query.
    * @param warmup Whether the executions are intended for warmup purposes only.
    * @param onQuery Callback for when a query is about to be executed.
-   * @returns The query reults, unless warmup is specified.
+   * @returns The query results, unless warmup is specified.
    */
   public async executeAllQueries(
     replication: number,
@@ -105,7 +110,10 @@ export class SparqlBenchmarkRunner {
           if (onQuery) {
             await onQuery(queryString);
           }
-          const result = await this.executeQuery(name, id.toString(), queryString);
+          let result = await this.executeQuery(name, id.toString(), queryString);
+          if (this.querySetsMetadata) {
+            result = { ...result, ...<any[]> this.querySetsMetadata[name][id] };
+          }
           if (!warmup) {
             results.push(result);
           }
@@ -185,6 +193,14 @@ export class SparqlBenchmarkRunner {
     result.hash = bindingsHash.digest('hex');
 
     return result;
+  }
+
+  public attachMetadataToResults(results: IResult[], metadatas: Record<string, Record<string, any>>):
+  Record<string, any>[] {
+    return results.map((result, i) => ({
+      ...result,
+      ...metadatas[i],
+    }));
   }
 
   /**
@@ -271,6 +287,10 @@ export interface ISparqlBenchmarkRunnerArgs {
    * Mapping of query set name to an array of SPARQL query strings in this set.
    */
   querySets: Record<string, string[]>;
+  /**
+   * Mapping of query set name to array of JSON metadata objects
+   */
+  querySetsMetadata?: Record<string, Record<string, any>>;
   /**
    * Number of replication runs.
    */

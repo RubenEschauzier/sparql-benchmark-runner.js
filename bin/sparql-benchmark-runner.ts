@@ -3,9 +3,11 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import type { IQueryLoader } from '../lib/QueryLoader';
 import { QueryLoaderFile } from '../lib/QueryLoaderFile';
-import type { IAggregateResult } from '../lib/Result';
+import type { IAggregateResult, IResult, IRunResult } from '../lib/Result';
+import { ResultAggregatorComunicaQuerySequence } from '../lib/ResultAggregatorComunicaQuerySequence';
 import type { IResultSerializer } from '../lib/ResultSerializer';
 import { ResultSerializerCsv } from '../lib/ResultSerializerCsv';
+import { ResultSerializerRaw } from '../lib/ResultSerializerRaw';
 import { SparqlBenchmarkRunner } from '../lib/SparqlBenchmarkRunner';
 
 const logger = (message: string): boolean => process.stdout.write(`[${new Date().toISOString()}] ${message}\n`);
@@ -16,9 +18,21 @@ async function loadQueries(path: string): Promise<Record<string, string[]>> {
   return await loader.loadQueries();
 }
 
+async function loadQueryMetadata(path: string): Promise<Record<string, Record<string, any>>> {
+  const loader: IQueryLoader = new QueryLoaderFile({ path });
+  logger(`Loading queries from ${path}`);
+  return await loader.loadQueriesMetadata();
+}
+
 async function serializeResults(path: string, results: IAggregateResult[]): Promise<void> {
   const serializer: IResultSerializer = new ResultSerializerCsv();
   logger(`Writing results to ${path}`);
+  await serializer.serialize(path, results);
+}
+
+async function serializeRawResults(path: string, results: IResult[]): Promise<void> {
+  const serializer: IResultSerializer = new ResultSerializerRaw();
+  logger(`Writing raw results to ${path}`);
   await serializer.serialize(path, results);
 }
 
@@ -55,6 +69,13 @@ async function main(): Promise<void> {
         description: 'Destination for the output CSV file',
         coerce: (arg: string) => resolve(arg),
       },
+      outputRaw: {
+        type: 'string',
+        default: './output-raw.json',
+        description: 'Destination for the output CSV file',
+        coerce: (arg: string) => resolve(arg),
+      },
+
       timeout: {
         type: 'number',
         description: 'Timeout value in seconds to use for individual queries',
@@ -65,17 +86,25 @@ async function main(): Promise<void> {
     .help()
     .parse();
   const querySets = await loadQueries(args.queries);
+  const querySetsMetadata = await loadQueryMetadata(args.queries);
+
   const runner = new SparqlBenchmarkRunner({
+    resultAggregator: new ResultAggregatorComunicaQuerySequence(),
     endpoint: args.endpoint,
     querySets,
+    querySetsMetadata,
     replication: args.replication,
     warmup: args.warmup,
     timeout: args.timeout,
     availabilityCheckTimeout: 1_000,
     logger,
   });
-  const results: IAggregateResult[] = await runner.run();
-  await serializeResults(args.output, results);
+
+  const results: IRunResult = await runner.run();
+  await serializeResults(args.output, results.aggregateResults);
+  if (results.rawResults) {
+    await serializeRawResults(args.outputRaw, results.rawResults);
+  }
 }
 
 main().then().catch((error: Error) => logger(`${error.name}: ${error.message}\n${error.stack}`));
