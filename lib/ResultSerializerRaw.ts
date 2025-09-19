@@ -7,7 +7,7 @@ export class ResultSerializerRaw extends ResultSerializer {
   protected readonly columnSeparator: string;
   protected readonly arraySeparator: string;
 
-  public constructor(options?: IResultSerializerCsvOptions) {
+  public constructor(options?: IResultSerializerRawOptions) {
     super(options);
     this.columnSeparator = options?.columnSeparator ?? ';';
     this.arraySeparator = options?.arraySeparator ?? ' ';
@@ -23,7 +23,7 @@ export class ResultSerializerRaw extends ResultSerializer {
   }
 }
 
-export interface IResultSerializerCsvOptions extends IResultSerializerOptions {
+export interface IResultSerializerRawOptions extends IResultSerializerOptions {
   columnSeparator: string;
   arraySeparator: string;
 }

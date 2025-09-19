@@ -5,4 +5,5 @@ export * from './ResultAggregator';
 export * from './ResultAggregatorComunica';
 export * from './ResultSerializer';
 export * from './ResultSerializerCsv';
+export * from './ResultSerializerRaw';
 export * from './SparqlBenchmarkRunner';

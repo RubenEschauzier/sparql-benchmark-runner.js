@@ -1,5 +1,5 @@
 {
-  "name": "sparql-benchmark-runner",
+  "name": "@rubeneschauzier/sparql-benchmark-runner",
   "version": "5.0.0",
   "packageManager": "yarn@1.22.22",
   "description": "Executes a query set against a given SPARQL endpoint",
