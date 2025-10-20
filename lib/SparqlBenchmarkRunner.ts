@@ -111,7 +111,7 @@ export class SparqlBenchmarkRunner {
             await onQuery(queryString);
           }
           let result = await this.executeQuery(name, id.toString(), queryString);
-          if (this.querySetsMetadata) {
+          if (this.querySetsMetadata && Object.keys(this.querySetsMetadata).length > 0) {
             result = { ...result, ...<any[]> this.querySetsMetadata[name][id] };
           }
           if (!warmup) {
