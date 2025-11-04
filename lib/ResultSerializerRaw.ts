@@ -19,7 +19,11 @@ export class ResultSerializerRaw extends ResultSerializer {
    * @param results The benchmark results to serialize.
    */
   public async serialize<T extends IResult>(path: string, results: T[]): Promise<void> {
-    await writeFile(path, JSON.stringify(results, null, 2), 'utf-8');
+    const resultsErrorMessages = results.map(result => ({
+      ...result,
+      error: result.error?.message ?? result.error,
+    }));
+    await writeFile(path, JSON.stringify(resultsErrorMessages, null, 2), 'utf-8');
   }
 }
 
