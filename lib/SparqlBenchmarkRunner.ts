@@ -22,6 +22,7 @@ export class SparqlBenchmarkRunner {
   protected readonly logger?: (message: string) => void;
   protected readonly resultAggregator: IResultAggregator;
   protected readonly availabilityCheckTimeout: number;
+  protected readonly resetCacheBetweenSetExecutions: boolean;
   public readonly endpointFetcher: SparqlEndpointFetcher;
 
   public constructor(options: ISparqlBenchmarkRunnerArgs) {
@@ -37,6 +38,7 @@ export class SparqlBenchmarkRunner {
     this.requestDelay = options.requestDelay;
     this.bindingsHashAlgorithm = 'md5';
     this.availabilityCheckTimeout = options.availabilityCheckTimeout ?? 10_000;
+    this.resetCacheBetweenSetExecutions = options.resetCacheBetweenSetExecutions ?? true;
     this.endpointFetcher = new SparqlEndpointFetcher({
       additionalUrlParams: options.additionalUrlParams,
       timeout: options.timeout,
@@ -101,6 +103,25 @@ export class SparqlBenchmarkRunner {
 
     for (const [ name, queryStrings ] of Object.entries(this.querySets)) {
       for (let i = 0; i < replication; i++) {
+        let resetDone = false;
+        const oldAdditionalParams = new URLSearchParams(this.endpointFetcher.additionalUrlParams);
+        if (this.resetCacheBetweenSetExecutions) {
+          const newAdditionalParams = new URLSearchParams(this.endpointFetcher.additionalUrlParams);
+
+          // 1. Get existing context JSON string
+          const contextStr = newAdditionalParams.get('context');
+
+          // 2. Parse to object (be careful: it may be null)
+          const context = contextStr ? JSON.parse(contextStr) : {};
+
+          // 3. Modify the object
+          context.cleanCache = true;
+
+          // 4. Stringify and set back
+          newAdditionalParams.set('context', JSON.stringify(context));
+          this.endpointFetcher.additionalUrlParams = newAdditionalParams;
+          resetDone = true;
+        }
         for (const [ id, queryString ] of queryStrings.entries()) {
           this.log(`Execute: ${(++finishedExecutions).toString().padStart(totalExecutions.length, ' ')} / ${totalExecutions} <${name}#${id}>`);
           await this.waitForEndpoint();
@@ -111,6 +132,11 @@ export class SparqlBenchmarkRunner {
             await onQuery(queryString);
           }
           let result = await this.executeQuery(name, id.toString(), queryString);
+
+          if (resetDone) {
+            this.endpointFetcher.additionalUrlParams = oldAdditionalParams;
+          }
+
           if (this.querySetsMetadata && Object.keys(this.querySetsMetadata).length > 0) {
             result = { ...result, ...<any[]> this.querySetsMetadata[name][id] };
           }
@@ -325,6 +351,10 @@ export interface ISparqlBenchmarkRunnerArgs {
    * A timeout in milliseconds for checking whether the SPARQL endpoint is up.
    */
   availabilityCheckTimeout?: number;
+  /**
+   * If the engine should reset the cache between executions
+   */
+  resetCacheBetweenSetExecutions?: boolean;
   /**
    * The delay between subsequent requests sent to the server.
    */
