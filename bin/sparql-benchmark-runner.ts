@@ -3,10 +3,11 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import type { IQueryLoader } from '../lib/QueryLoader';
 import { QueryLoaderFile } from '../lib/QueryLoaderFile';
-import type { IAggregateResult } from '../lib/Result';
+import type { IAggregateResult, IResult } from '../lib/Result';
 import type { IResultSerializer } from '../lib/ResultSerializer';
 import { ResultSerializerCsv } from '../lib/ResultSerializerCsv';
-import { SparqlBenchmarkRunner } from '../lib/SparqlBenchmarkRunner';
+import { ResultSerializerRaw } from '../lib/ResultSerializerRaw';
+import { type ISparqlBenchmarkRunnerResults, SparqlBenchmarkRunner } from '../lib/SparqlBenchmarkRunner';
 
 const logger = (message: string): boolean => process.stdout.write(`[${new Date().toISOString()}] ${message}\n`);
 
@@ -19,6 +20,12 @@ async function loadQueries(path: string): Promise<Record<string, string[]>> {
 async function serializeResults(path: string, results: IAggregateResult[]): Promise<void> {
   const serializer: IResultSerializer = new ResultSerializerCsv();
   logger(`Writing results to ${path}`);
+  await serializer.serialize(path, results);
+}
+
+async function serializeResultsRaw(path: string, results: IResult[]): Promise<void> {
+  const serializer: IResultSerializer = new ResultSerializerRaw();
+  logger(`Writing raw results to ${path}`);
   await serializer.serialize(path, results);
 }
 
@@ -55,6 +62,12 @@ async function main(): Promise<void> {
         description: 'Destination for the output CSV file',
         coerce: (arg: string) => resolve(arg),
       },
+      outputRaw: {
+        type: 'string',
+        default: './output-raw.json',
+        description: 'Destination for the output raw JSON file',
+        coerce: (arg: string) => resolve(arg),
+      },
       timeout: {
         type: 'number',
         description: 'Timeout value in seconds to use for individual queries',
@@ -74,8 +87,9 @@ async function main(): Promise<void> {
     availabilityCheckTimeout: 1_000,
     logger,
   });
-  const results: IAggregateResult[] = await runner.run();
-  await serializeResults(args.output, results);
+  const results: ISparqlBenchmarkRunnerResults = await runner.run();
+  await serializeResults(args.output, results.aggregateResults);
+  await serializeResultsRaw(args.outputRaw, results.rawResults);
 }
 
 main().then().catch((error: Error) => logger(`${error.name}: ${error.message}\n${error.stack}`));

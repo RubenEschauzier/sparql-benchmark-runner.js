@@ -46,7 +46,7 @@ export class SparqlBenchmarkRunner {
    * execute all query sets against the SPARQL endpoint.
    * Afterwards, all results are collected and averaged.
    */
-  public async run(options: IRunOptions = {}): Promise<IAggregateResult[]> {
+  public async run(options: IRunOptions = {}): Promise<ISparqlBenchmarkRunnerResults> {
     // Execute queries in warmup
     if (this.warmup > 0) {
       await this.executeAllQueries(this.warmup, true, options.onQuery);
@@ -65,7 +65,7 @@ export class SparqlBenchmarkRunner {
 
     const aggregateResults = this.resultAggregator.aggregateResults(results);
 
-    return aggregateResults;
+    return { aggregateResults, rawResults: results };
   }
 
   /**
@@ -325,4 +325,15 @@ export interface IRunOptions {
    * @param queryString A query string.
    */
   onQuery?: (queryString: string) => Promise<void>;
+}
+
+export interface ISparqlBenchmarkRunnerResults {
+  /**
+   * The aggregated results
+   */
+  aggregateResults: IAggregateResult[];
+  /**
+   * Raw results used as input to the aggregator (with any optional metadata)
+   */
+  rawResults: IResult[];
 }
