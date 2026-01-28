@@ -152,20 +152,38 @@ export class SparqlBenchmarkRunner {
     });
 
     const queryPromise = new Promise<void>((resolve, reject) => {
-      this.endpointFetcher.fetchBindings(this.endpoint, queryString)
-        .then(bindingsStream => bindingsStream
-          .on('metadata', (metadata: IResultMetadata) => {
-            for (const [ key, value ] of Object.entries(metadata)) {
-              // eslint-disable-next-line ts/no-unsafe-assignment
-              result[key] = value;
-            }
-          })
-          .on('data', (bindings: Record<string, RDF.Term>) => {
-            result.timestamps.push(Math.round(this.countTime(hrstart)));
-            result.results++;
-            bindingsStrings.push(this.bindingsToString(bindings));
-          })
-          .on('end', resolve).on('error', reject)).catch(reject);
+      if (queryString.includes("CONSTRUCT")){
+        this.endpointFetcher.fetchTriples(this.endpoint, queryString)
+          .then(quadStream => quadStream
+            .on('metadata', (metadata: IResultMetadata) => {
+              for (const [ key, value ] of Object.entries(metadata)) {
+                // eslint-disable-next-line ts/no-unsafe-assignment
+                result[key] = value;
+              }
+            })
+            .on('data', (bindings: RDF.Quad) => {
+              result.timestamps.push(Math.round(this.countTime(hrstart)));
+              result.results++;
+              bindingsStrings.push("quad");
+            })
+            .on('end', resolve).on('error', reject)).catch(reject);
+      }
+      else{
+        this.endpointFetcher.fetchBindings(this.endpoint, queryString)
+          .then(bindingsStream => bindingsStream
+            .on('metadata', (metadata: IResultMetadata) => {
+              for (const [ key, value ] of Object.entries(metadata)) {
+                // eslint-disable-next-line ts/no-unsafe-assignment
+                result[key] = value;
+              }
+            })
+            .on('data', (bindings: Record<string, RDF.Term>) => {
+              result.timestamps.push(Math.round(this.countTime(hrstart)));
+              result.results++;
+              bindingsStrings.push(this.bindingsToString(bindings));
+            })
+            .on('end', resolve).on('error', reject)).catch(reject);
+      }
     });
 
     try {
