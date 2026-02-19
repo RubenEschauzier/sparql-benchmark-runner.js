@@ -115,7 +115,7 @@ export class SparqlBenchmarkRunner {
           const context = contextStr ? JSON.parse(contextStr) : {};
 
           // 3. Modify the object
-          context.cleanCache = true;
+          context.clearCache = true;
 
           // 4. Stringify and set back
           newAdditionalParams.set('context', JSON.stringify(context));
