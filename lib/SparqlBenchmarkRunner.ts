@@ -103,39 +103,19 @@ export class SparqlBenchmarkRunner {
 
     for (const [ name, queryStrings ] of Object.entries(this.querySets)) {
       for (let i = 0; i < replication; i++) {
-        let resetDone = false;
-        const oldAdditionalParams = new URLSearchParams(this.endpointFetcher.additionalUrlParams);
-        if (this.resetCacheBetweenSetExecutions) {
-          const newAdditionalParams = new URLSearchParams(this.endpointFetcher.additionalUrlParams);
-
-          // 1. Get existing context JSON string
-          const contextStr = newAdditionalParams.get('context');
-
-          // 2. Parse to object (be careful: it may be null)
-          const context = contextStr ? JSON.parse(contextStr) : {};
-
-          // 3. Modify the object
-          context.clearCache = true;
-
-          // 4. Stringify and set back
-          newAdditionalParams.set('context', JSON.stringify(context));
-          this.endpointFetcher.additionalUrlParams = newAdditionalParams;
-          resetDone = true;
-        }
         for (const [ id, queryString ] of queryStrings.entries()) {
           this.log(`Execute: ${(++finishedExecutions).toString().padStart(totalExecutions.length, ' ')} / ${totalExecutions} <${name}#${id}>`);
+          
           await this.waitForEndpoint();
+          
           if (this.requestDelay) {
             await this.sleep(this.requestDelay);
           }
           if (onQuery) {
             await onQuery(queryString);
           }
+          
           let result = await this.executeQuery(name, id.toString(), queryString);
-
-          if (resetDone) {
-            this.endpointFetcher.additionalUrlParams = oldAdditionalParams;
-          }
 
           if (this.querySetsMetadata && Object.keys(this.querySetsMetadata).length > 0) {
             result = { ...result, ...<any[]> this.querySetsMetadata[name][id] };
@@ -145,6 +125,21 @@ export class SparqlBenchmarkRunner {
           }
           if (this.requestDelay) {
             await this.sleep(this.requestDelay);
+          }
+        }
+
+        // Trigger the worker restart after completing the query set execution
+        if (this.resetCacheBetweenSetExecutions) {
+          this.log(`Sending cache refresh signal to trigger worker restart.`);
+          try {
+            await fetch(this.endpoint, {
+              method: 'GET',
+              headers: {
+                'x-comunica-refresh-cache': 'true'
+              }
+            });
+          } catch {
+            // Suppress error: The server terminates the connection forcefully during shutdown.
           }
         }
       }
