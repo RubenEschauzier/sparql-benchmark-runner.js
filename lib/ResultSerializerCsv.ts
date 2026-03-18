@@ -59,7 +59,7 @@ export class ResultSerializerCsv extends ResultSerializer {
                   values.push(value.join(this.arraySeparator));
                 }
               } else if (value instanceof Error) {
-                values.push(value.message);
+                values.push(value.message.replace('\n', '\\n'));
               } else {
                 values.push(<string>value.constructor.name);
               }

@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+<a name="v5.0.1"></a>
+## [v5.0.1](https://github.com/comunica/sparql-benchmark-runner.js/compare/v5.0.0...v5.0.1) - 2025-09-12
+
+### Fixed
+* [Fix newlines in error messages not being escaped](https://github.com/comunica/sparql-benchmark-runner.js/commit/9f6028bf93cc7ab61aa0cd419aeaf86ded73af89)
+
 <a name="v5.0.0"></a>
 ## [v5.0.0](https://github.com/comunica/sparql-benchmark-runner.js/compare/v4.5.0...v5.0.0) - 2025-03-07
 

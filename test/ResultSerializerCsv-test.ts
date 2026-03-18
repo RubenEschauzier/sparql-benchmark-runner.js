@@ -53,6 +53,16 @@ describe('ResultSerializerCsv', () => {
         timestamps: [],
         objectValue: new ReadableStream(),
       },
+      {
+        name: 'a',
+        id: '2',
+        time: 0,
+        error: new Error('Example error\nWith newline'),
+        results: 0,
+        hash: 'error',
+        timestamps: [],
+        objectValue: new ReadableStream(),
+      },
     ];
   });
 
@@ -83,6 +93,7 @@ describe('ResultSerializerCsv', () => {
       'a;0;1;false;;functionValue;hash;;0;;;0;;;\n',
       'a;1;;false;;;result;;1;Example symbol;;1;1;;"[[1]]"\n',
       'a;2;;true;Example error;;error;ReadableStream;0;;;0;;;\n',
+      'a;2;;true;Example error\\nWith newline;;error;ReadableStream;0;;;0;;;\n',
     ];
     await resultSerializer.serialize('results.csv', results);
     for (const [ index, line ] of expectedLines.entries()) {
