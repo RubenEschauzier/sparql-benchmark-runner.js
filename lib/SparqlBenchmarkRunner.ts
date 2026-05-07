@@ -219,8 +219,7 @@ export class SparqlBenchmarkRunner {
     return result;
   }
 
-  public attachMetadataToResults(results: IResult[], metadatas?: IQuerySetMetadata):
-  Record<string, any>[] {
+  public attachMetadataToResults(results: IResult[], metadatas?: IQuerySetMetadata): IResult[] {
     return results.map((result, i) => {
       const metadata = metadatas?.[i];
       return metadata ? { ...result, ...metadata } : { ...result };

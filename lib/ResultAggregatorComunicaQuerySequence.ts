@@ -18,7 +18,7 @@ export class ResultAggregatorComunicaQuerySequence extends ResultAggregatorComun
         result.sequence = result.name;
         result.name = template;
       }
-      const key = template ?? result.name;
+      const key: string = template ?? result.name;
       if (!(key in templates)) {
         templates[key] = [];
       }
