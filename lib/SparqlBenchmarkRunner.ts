@@ -22,7 +22,7 @@ export class SparqlBenchmarkRunner {
   protected readonly logger?: (message: string) => void;
   protected readonly resultAggregator: IResultAggregator;
   protected readonly availabilityCheckTimeout: number;
-  protected readonly resetCacheBetweenSetExecutions: boolean;
+  protected readonly sendResetSignalBetweenQuerySets: boolean;
   public readonly endpointFetcher: SparqlEndpointFetcher;
 
   public constructor(options: ISparqlBenchmarkRunnerArgs) {
@@ -38,7 +38,7 @@ export class SparqlBenchmarkRunner {
     this.requestDelay = options.requestDelay;
     this.bindingsHashAlgorithm = 'md5';
     this.availabilityCheckTimeout = options.availabilityCheckTimeout ?? 10_000;
-    this.resetCacheBetweenSetExecutions = options.resetCacheBetweenSetExecutions ?? true;
+    this.sendResetSignalBetweenQuerySets = options.resetCacheBetweenSetExecutions ?? true;
     this.endpointFetcher = new SparqlEndpointFetcher({
       additionalUrlParams: options.additionalUrlParams,
       timeout: options.timeout,
@@ -129,7 +129,7 @@ export class SparqlBenchmarkRunner {
         }
 
         // Trigger the worker restart after completing the query set execution
-        if (this.resetCacheBetweenSetExecutions) {
+        if (this.sendResetSignalBetweenQuerySets) {
           this.log(`Sending cache refresh signal to trigger worker restart.`);
           try {
             await fetch(this.endpoint, {
