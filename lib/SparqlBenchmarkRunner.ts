@@ -2,6 +2,7 @@ import { createHash, type Hash } from 'node:crypto';
 import type * as RDF from '@rdfjs/types';
 import { SparqlEndpointFetcher } from 'fetch-sparql-endpoint';
 import { termToString } from 'rdf-string';
+import type { IQuerySetMetadata } from './QueryLoader';
 import type { IResult, IResultMetadata, IRunResult } from './Result';
 import type { IResultAggregator } from './ResultAggregator';
 import { ResultAggregatorComunica } from './ResultAggregatorComunica';
@@ -17,7 +18,7 @@ export class SparqlBenchmarkRunner {
   protected readonly replication: number;
   protected readonly warmup: number;
   protected readonly querySets: Record<string, string[]>;
-  protected readonly querySetsMetadata?: Record<string, Record<string, any>>;
+  protected readonly querySetsMetadata?: Record<string, IQuerySetMetadata>;
   protected readonly bindingsHashAlgorithm: string;
   protected readonly logger?: (message: string) => void;
   protected readonly resultAggregator: IResultAggregator;
@@ -38,7 +39,7 @@ export class SparqlBenchmarkRunner {
     this.requestDelay = options.requestDelay;
     this.bindingsHashAlgorithm = 'md5';
     this.availabilityCheckTimeout = options.availabilityCheckTimeout ?? 10_000;
-    this.sendResetSignalBetweenQuerySets = options.resetCacheBetweenSetExecutions ?? true;
+    this.sendResetSignalBetweenQuerySets = options.resetCacheBetweenSetExecutions ?? false;
     this.endpointFetcher = new SparqlEndpointFetcher({
       additionalUrlParams: options.additionalUrlParams,
       timeout: options.timeout,
@@ -105,20 +106,22 @@ export class SparqlBenchmarkRunner {
       for (let i = 0; i < replication; i++) {
         for (const [ id, queryString ] of queryStrings.entries()) {
           this.log(`Execute: ${(++finishedExecutions).toString().padStart(totalExecutions.length, ' ')} / ${totalExecutions} <${name}#${id}>`);
-          
+
           await this.waitForEndpoint();
-          
+
           if (this.requestDelay) {
             await this.sleep(this.requestDelay);
           }
           if (onQuery) {
             await onQuery(queryString);
           }
-          
+
           let result = await this.executeQuery(name, id.toString(), queryString);
 
-          if (this.querySetsMetadata && Object.keys(this.querySetsMetadata).length > 0) {
-            result = { ...result, ...<any[]> this.querySetsMetadata[name][id] };
+          const querySetMetadata = this.querySetsMetadata?.[name];
+          const queryMetadata = querySetMetadata?.[id];
+          if (queryMetadata) {
+            result = { ...result, ...queryMetadata };
           }
           if (!warmup) {
             results.push(result);
@@ -132,11 +135,11 @@ export class SparqlBenchmarkRunner {
         if (this.sendResetSignalBetweenQuerySets) {
           this.log(`Sending cache refresh signal to trigger worker restart.`);
           try {
+            const refreshHeaders = new Headers();
+            refreshHeaders.set('x-comunica-refresh-cache', 'true');
             await fetch(this.endpoint, {
               method: 'GET',
-              headers: {
-                'x-comunica-refresh-cache': 'true'
-              }
+              headers: refreshHeaders,
             });
           } catch {
             // Suppress error: The server terminates the connection forcefully during shutdown.
@@ -216,12 +219,12 @@ export class SparqlBenchmarkRunner {
     return result;
   }
 
-  public attachMetadataToResults(results: IResult[], metadatas: Record<string, Record<string, any>>):
+  public attachMetadataToResults(results: IResult[], metadatas?: IQuerySetMetadata):
   Record<string, any>[] {
-    return results.map((result, i) => ({
-      ...result,
-      ...metadatas[i],
-    }));
+    return results.map((result, i) => {
+      const metadata = metadatas?.[i];
+      return metadata ? { ...result, ...metadata } : { ...result };
+    });
   }
 
   /**
@@ -311,7 +314,7 @@ export interface ISparqlBenchmarkRunnerArgs {
   /**
    * Mapping of query set name to array of JSON metadata objects
    */
-  querySetsMetadata?: Record<string, Record<string, any>>;
+  querySetsMetadata?: Record<string, IQuerySetMetadata>;
   /**
    * Number of replication runs.
    */
