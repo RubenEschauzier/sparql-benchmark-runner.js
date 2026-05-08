@@ -69,7 +69,7 @@ export class SparqlBenchmarkRunner {
     }
 
     const aggregateResults = this.resultAggregator.aggregateResults(results);
-    const runResult = <IRunResult><unknown>aggregateResults;
+    const runResult = aggregateResults;
     Object.defineProperties(runResult, {
       aggregateResults: {
         value: aggregateResults,
@@ -80,7 +80,8 @@ export class SparqlBenchmarkRunner {
         enumerable: false,
       },
     });
-    return runResult;
+    // Backward compatibility: callers may still treat the return value as the aggregate results array.
+    return <IRunResult>runResult;
   }
 
   /**
