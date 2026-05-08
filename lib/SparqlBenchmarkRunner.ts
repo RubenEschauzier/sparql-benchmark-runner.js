@@ -73,9 +73,11 @@ export class SparqlBenchmarkRunner {
     Object.defineProperties(runResult, {
       aggregateResults: {
         value: aggregateResults,
+        enumerable: false,
       },
       rawResults: {
         value: results,
+        enumerable: false,
       },
     });
     return runResult;
