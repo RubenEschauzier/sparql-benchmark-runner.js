@@ -184,6 +184,8 @@ describe('SparqlBenchmarkRunner', () => {
       expect(fetch).toHaveBeenCalledTimes(expectedCalls);
 
       expect(Array.isArray(results)).toBe(true);
+      expect(results).toHaveLength(expectedResults.length);
+      expect(results[0]).toEqual(expectedResults[0]);
       expect([ ...results ]).toEqual(expectedResults);
       expect(results.aggregateResults).toEqual(expectedResults);
       expect(results.rawResults).toHaveLength(Object.values(querySets).flatMap(qs => qs).length * replication);
