@@ -69,6 +69,7 @@ export class SparqlBenchmarkRunner {
     }
 
     const aggregateResults = this.resultAggregator.aggregateResults(results);
+    // Keep the aggregate results array identity so existing callers can keep using `run()` as before.
     const runResult = aggregateResults;
     Object.defineProperties(runResult, {
       aggregateResults: {
