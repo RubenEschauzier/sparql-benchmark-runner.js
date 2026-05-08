@@ -111,7 +111,7 @@ async function main(): Promise<void> {
   });
 
   const results: IRunResult = await runner.run();
-  await serializeResults(args.output, results.aggregateResults);
+  await serializeResults(args.output, results);
   const outputRaw = args.outputRaw ?? (args.metadata ? resolve('./output-raw.json') : undefined);
   if (results.rawResults && outputRaw) {
     await serializeRawResults(outputRaw, results.rawResults);

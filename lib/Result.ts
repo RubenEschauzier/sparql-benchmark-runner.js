@@ -60,10 +60,12 @@ export interface IAggregateResult extends IResult {
   timestampsAll: number[][];
 }
 
-export interface IRunResult {
+export interface IRunResultObject {
   // Aggregated result of the run
   aggregateResults: IAggregateResult[];
 
   // Optional raw results of the run
   rawResults?: IResult[];
 }
+
+export type IRunResult = IAggregateResult[] & IRunResultObject;

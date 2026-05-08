@@ -69,11 +69,16 @@ export class SparqlBenchmarkRunner {
     }
 
     const aggregateResults = this.resultAggregator.aggregateResults(results);
-
-    return {
-      aggregateResults,
-      rawResults: results,
-    };
+    const runResult = <IRunResult>aggregateResults;
+    Object.defineProperties(runResult, {
+      aggregateResults: {
+        value: aggregateResults,
+      },
+      rawResults: {
+        value: results,
+      },
+    });
+    return runResult;
   }
 
   /**

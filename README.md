@@ -120,7 +120,7 @@ async function executeQueries(pathToQueries, pathToOutputCsv) {
 
   const results = await runner.run();
 
-  await resultSerializer.serialize(pathToOutputCsv, results.aggregateResults);
+  await resultSerializer.serialize(pathToOutputCsv, results);
 }
 ```
 
@@ -128,6 +128,10 @@ To enable sequence metadata from the CLI, add `--metadata`. Raw JSON output is
 only written when `--outputRaw` is provided, or automatically to
 `./output-raw.json` when `--metadata` is enabled. Cache refresh requests are
 disabled by default and can be enabled with `--refreshAfterQuerySet`.
+
+`run()` remains backward compatible with earlier versions that returned the
+aggregated results array directly. The returned array now also exposes
+`aggregateResults` and `rawResults` properties for callers that need both views.
 
 ## Docker
 
