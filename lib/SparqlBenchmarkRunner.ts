@@ -69,7 +69,7 @@ export class SparqlBenchmarkRunner {
     }
 
     const aggregateResults = this.resultAggregator.aggregateResults(results);
-    const runResult = <IRunResult>aggregateResults;
+    const runResult = <IRunResult><unknown>aggregateResults;
     Object.defineProperties(runResult, {
       aggregateResults: {
         value: aggregateResults,
