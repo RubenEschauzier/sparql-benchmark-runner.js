@@ -69,20 +69,11 @@ export class SparqlBenchmarkRunner {
     }
 
     const aggregateResults = this.resultAggregator.aggregateResults(results);
-    // Keep the aggregate results array identity so existing callers can keep using `run()` as before.
-    const runResult = aggregateResults;
-    Object.defineProperties(runResult, {
-      aggregateResults: {
-        value: aggregateResults,
-        enumerable: false,
-      },
-      rawResults: {
-        value: results,
-        enumerable: false,
-      },
-    });
-    // Backward compatibility: callers may still treat the return value as the aggregate results array.
-    return <IRunResult>runResult;
+
+    return {
+      aggregateResults,
+      rawResults: results,
+    };
   }
 
   /**
