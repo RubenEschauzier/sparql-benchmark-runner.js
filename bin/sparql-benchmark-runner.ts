@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import type { IQueryLoader } from '../lib/QueryLoader';
+import type { IQueryLoader, IQuerySetMetadata } from '../lib/QueryLoader';
 import { QueryLoaderFile } from '../lib/QueryLoaderFile';
 import type { IAggregateResult, IResult, IRunResult } from '../lib/Result';
 import { ResultAggregatorComunicaQuerySequence } from '../lib/ResultAggregatorComunicaQuerySequence';
@@ -18,9 +18,9 @@ async function loadQueries(path: string): Promise<Record<string, string[]>> {
   return await loader.loadQueries();
 }
 
-async function loadQueryMetadata(path: string): Promise<Record<string, Record<string, any>>> {
+async function loadQueryMetadata(path: string): Promise<Record<string, IQuerySetMetadata>> {
   const loader: IQueryLoader = new QueryLoaderFile({ path });
-  logger(`Loading queries from ${path}`);
+  logger(`Loading query metadata from ${path}`);
   return await loader.loadQueriesMetadata();
 }
 
@@ -71,9 +71,18 @@ async function main(): Promise<void> {
       },
       outputRaw: {
         type: 'string',
-        default: './output-raw.json',
-        description: 'Destination for the output CSV file',
+        description: 'Destination for the raw JSON output file',
         coerce: (arg: string) => resolve(arg),
+      },
+      metadata: {
+        type: 'boolean',
+        default: false,
+        description: 'Load query metadata files (*.metadata.json) and enable sequence aggregation',
+      },
+      refreshAfterQuerySet: {
+        type: 'boolean',
+        default: false,
+        description: 'Send a cache refresh request after each query set execution',
       },
 
       timeout: {
@@ -86,10 +95,10 @@ async function main(): Promise<void> {
     .help()
     .parse();
   const querySets = await loadQueries(args.queries);
-  const querySetsMetadata = await loadQueryMetadata(args.queries);
+  const querySetsMetadata = args.metadata ? await loadQueryMetadata(args.queries) : undefined;
 
   const runner = new SparqlBenchmarkRunner({
-    resultAggregator: new ResultAggregatorComunicaQuerySequence(),
+    resultAggregator: args.metadata ? new ResultAggregatorComunicaQuerySequence() : undefined,
     endpoint: args.endpoint,
     querySets,
     querySetsMetadata,
@@ -98,12 +107,14 @@ async function main(): Promise<void> {
     timeout: args.timeout,
     availabilityCheckTimeout: 1_000,
     logger,
+    resetCacheBetweenSetExecutions: args.refreshAfterQuerySet,
   });
 
   const results: IRunResult = await runner.run();
   await serializeResults(args.output, results.aggregateResults);
-  if (results.rawResults) {
-    await serializeRawResults(args.outputRaw, results.rawResults);
+  const outputRaw = args.outputRaw ?? (args.metadata ? resolve('./output-raw.json') : undefined);
+  if (results.rawResults && outputRaw) {
+    await serializeRawResults(outputRaw, results.rawResults);
   }
 }
 

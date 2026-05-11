@@ -13,13 +13,16 @@ export class ResultAggregatorComunicaQuerySequence extends ResultAggregatorComun
   public override groupResults(results: IResult[]): Record<string, IResult[]> {
     const templates: Record<string, IResult[]> = {};
     for (const result of results) {
-      const template = <string> result.template;
-      result.sequence = result.name;
-      result.name = template;
-      if (!(template in templates)) {
-        templates[template] = [];
+      const template = typeof result.template === 'string' ? result.template : undefined;
+      if (template) {
+        result.sequence = result.name;
+        result.name = template;
       }
-      templates[template].push(result);
+      const key: string = template ?? result.name;
+      if (!(key in templates)) {
+        templates[key] = [];
+      }
+      templates[key].push(result);
     }
     return templates;
   }
@@ -39,7 +42,10 @@ export class ResultAggregatorComunicaQuerySequence extends ResultAggregatorComun
 
   public aggregateResults(results: IResult[]): IAggregateResult[] {
     for (const result of results) {
-      result.template = <string> result.sequenceElement.template;
+      const sequenceElementTemplate: unknown = result.sequenceElement?.template;
+      if (typeof result.template !== 'string' && typeof sequenceElementTemplate === 'string') {
+        result.template = sequenceElementTemplate;
+      }
     }
 
     const groupedResults = this.groupResults(results);

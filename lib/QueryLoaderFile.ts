@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, extname, resolve } from 'node:path';
-import type { IQueryLoader } from './QueryLoader';
+import type { IQueryLoader, IQuerySetMetadata } from './QueryLoader';
 
 export class QueryLoaderFile implements IQueryLoader {
   protected readonly path: string;
@@ -25,8 +25,8 @@ export class QueryLoaderFile implements IQueryLoader {
     return querySets;
   }
 
-  public async loadQueriesMetadata(): Promise<Record<string, Record<string, any>>> {
-    const queryMetadata: Record<string, Record<string, any>> = {};
+  public async loadQueriesMetadata(): Promise<Record<string, IQuerySetMetadata>> {
+    const queryMetadata: Record<string, IQuerySetMetadata> = {};
     await QueryLoaderFile.loadQueriesMetadataStatic(
       queryMetadata,
       this.path,
@@ -101,7 +101,7 @@ export class QueryLoaderFile implements IQueryLoader {
    * ]
    */
   protected static async loadQueriesMetadataStatic(
-    queryMetadata: Record<string, Record<string, any>>,
+    queryMetadata: Record<string, IQuerySetMetadata>,
     path: string,
     extensions: Set<string>,
     indicators: Set<string>,
@@ -111,6 +111,10 @@ export class QueryLoaderFile implements IQueryLoader {
       if (dirent.isFile()) {
         const extension = extname(dirent.name);
         if (extensions.has(extension)) {
+          const fileNameWithoutExtension = dirent.name.replace(extension, '');
+          if (!this.hasMetadataIndicator(fileNameWithoutExtension, indicators)) {
+            continue;
+          }
           const filePath = join(path, dirent.name);
           const raw = await readFile(filePath, 'utf-8');
           const parsed = <Record<string, any>> JSON.parse(raw);
@@ -134,7 +138,7 @@ export class QueryLoaderFile implements IQueryLoader {
 
           for (const element of arrayValue) {
             const obj = { ...baseFields, [arrayKey.slice(0, -1)]: <Record<string, any>> element };
-            const cleanedDirent = this.removeMatches(dirent.name.replace(extension, ''), indicators);
+            const cleanedDirent = this.removeMatches(fileNameWithoutExtension, indicators);
             // Store as array of objects per file
             (queryMetadata[prefix + cleanedDirent] ??= []).push(obj);
           }
@@ -153,6 +157,15 @@ export class QueryLoaderFile implements IQueryLoader {
       }
     }
     return stripped;
+  }
+
+  protected static hasMetadataIndicator(filename: string, metadataIndicators: Set<string>): boolean {
+    for (const indicator of metadataIndicators) {
+      if (filename.includes(indicator)) {
+        return true;
+      }
+    }
+    return false;
   }
 }
 

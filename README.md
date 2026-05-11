@@ -64,7 +64,12 @@ Options:
   --replication  Number of replication runs                [number] [default: 5]
   --warmup       Number of warmup runs                     [number] [default: 1]
   --output       Destination for the output CSV file
-                                              [string] [default: "./output.csv"]
+                                               [string] [default: "./output.csv"]
+  --outputRaw    Destination for the raw JSON output file                 [string]
+  --metadata     Load query metadata files (*.metadata.json) and enable
+                 sequence aggregation                   [boolean] [default: false]
+  --refreshAfterQuerySet  Send a cache refresh request after each query set
+                 execution                              [boolean] [default: false]
   --timeout      Timeout value in seconds to use for individual queries [number]
   ----help
 ```
@@ -84,6 +89,8 @@ result aggregators and result serializers to accommodate special use cases.
 By default, when no specific result aggregator is provided,
 the runner uses `ResultAggregatorComunica` that handles basic aggregation,
 as well as the `httpRequests` metadata field from a Comunica SPARQL endpoint, if such metadata is provided.
+Metadata-based sequence aggregation is optional and can be enabled by passing
+query metadata to the runner together with `ResultAggregatorComunicaQuerySequence`.
 
 ```javascript
 import {
@@ -113,9 +120,14 @@ async function executeQueries(pathToQueries, pathToOutputCsv) {
 
   const results = await runner.run();
 
-  await resultSerializer.serialize(path, results);
+  await resultSerializer.serialize(pathToOutputCsv, results.aggregateResults);
 }
 ```
+
+To enable sequence metadata from the CLI, add `--metadata`. Raw JSON output is
+only written when `--outputRaw` is provided, or automatically to
+`./output-raw.json` when `--metadata` is enabled. Cache refresh requests are
+disabled by default and can be enabled with `--refreshAfterQuerySet`.
 
 ## Docker
 

@@ -3,6 +3,7 @@ export * from './QueryLoaderFile';
 export * from './Result';
 export * from './ResultAggregator';
 export * from './ResultAggregatorComunica';
+export * from './ResultAggregatorComunicaQuerySequence';
 export * from './ResultSerializer';
 export * from './ResultSerializerCsv';
 export * from './ResultSerializerRaw';
