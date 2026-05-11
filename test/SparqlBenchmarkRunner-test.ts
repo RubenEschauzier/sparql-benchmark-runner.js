@@ -183,6 +183,8 @@ describe('SparqlBenchmarkRunner', () => {
       expect(fetcher.fetchBindings).toHaveBeenCalledTimes(expectedCalls);
       expect(fetch).toHaveBeenCalledTimes(expectedCalls);
 
+      expect(Array.isArray(results)).toBe(false);
+      expect((<{ 0?: IAggregateResult }><unknown>results)[0]).toBeUndefined();
       expect(results.aggregateResults).toEqual(expectedResults);
       expect(results.rawResults).toHaveLength(Object.values(querySets).flatMap(qs => qs).length * replication);
     });
