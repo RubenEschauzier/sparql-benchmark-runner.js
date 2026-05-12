@@ -79,10 +79,10 @@ async function main(): Promise<void> {
         default: false,
         description: 'Load query metadata files (*.metadata.json) and enable sequence aggregation',
       },
-      refreshAfterQuerySet: {
+      invalidateCacheAfterQuerySet: {
         type: 'boolean',
         default: false,
-        description: 'Send a cache refresh request after each query set execution',
+        description: 'Send a cache invalidation request after each query set execution',
       },
 
       timeout: {
@@ -107,7 +107,7 @@ async function main(): Promise<void> {
     timeout: args.timeout,
     availabilityCheckTimeout: 1_000,
     logger,
-    resetCacheBetweenSetExecutions: args.refreshAfterQuerySet,
+    invalidateCacheBetweenSetExecutions: args.invalidateCacheAfterQuerySet,
   });
 
   const results: IRunResult = await runner.run();

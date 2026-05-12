@@ -23,7 +23,7 @@ export class SparqlBenchmarkRunner {
   protected readonly logger?: (message: string) => void;
   protected readonly resultAggregator: IResultAggregator;
   protected readonly availabilityCheckTimeout: number;
-  protected readonly sendResetSignalBetweenQuerySets: boolean;
+  protected readonly invalidateCacheBetweenSetExecutions: boolean;
   public readonly endpointFetcher: SparqlEndpointFetcher;
 
   public constructor(options: ISparqlBenchmarkRunnerArgs) {
@@ -39,7 +39,7 @@ export class SparqlBenchmarkRunner {
     this.requestDelay = options.requestDelay;
     this.bindingsHashAlgorithm = 'md5';
     this.availabilityCheckTimeout = options.availabilityCheckTimeout ?? 10_000;
-    this.sendResetSignalBetweenQuerySets = options.resetCacheBetweenSetExecutions ?? false;
+    this.invalidateCacheBetweenSetExecutions = options.invalidateCacheBetweenSetExecutions ?? false;
     this.endpointFetcher = new SparqlEndpointFetcher({
       additionalUrlParams: options.additionalUrlParams,
       timeout: options.timeout,
@@ -132,14 +132,14 @@ export class SparqlBenchmarkRunner {
         }
 
         // Trigger the worker restart after completing the query set execution
-        if (this.sendResetSignalBetweenQuerySets) {
-          this.log(`Sending cache refresh signal to trigger worker restart.`);
+        if (this.invalidateCacheBetweenSetExecutions) {
+          this.log(`Sending cache invalidation signal to trigger worker restart.`);
           try {
-            const refreshHeaders = new Headers();
-            refreshHeaders.set('x-comunica-refresh-cache', 'true');
+            const invalidationHeaders = new Headers();
+            invalidationHeaders.set('x-comunica-refresh-cache', 'true');
             await fetch(this.endpoint, {
               method: 'GET',
-              headers: refreshHeaders,
+              headers: invalidationHeaders,
             });
           } catch {
             // Suppress error: The server terminates the connection forcefully during shutdown.
@@ -351,7 +351,7 @@ export interface ISparqlBenchmarkRunnerArgs {
   /**
    * If the engine should reset the cache between executions
    */
-  resetCacheBetweenSetExecutions?: boolean;
+  invalidateCacheBetweenSetExecutions?: boolean;
   /**
    * The delay between subsequent requests sent to the server.
    */

@@ -468,21 +468,21 @@ describe('SparqlBenchmarkRunner', () => {
       expect(results[4]).not.toHaveProperty('template');
     });
 
-    it('sends cache refresh requests only when enabled', async() => {
+    it('sends cache invalidation requests only when enabled', async() => {
       runner = new SparqlBenchmarkRunner({
         endpoint,
         querySets,
         replication,
         warmup,
         logger,
-        resetCacheBetweenSetExecutions: true,
+        invalidateCacheBetweenSetExecutions: true,
       });
 
       await runner.executeAllQueries(replication, false);
 
       const queryExecutions = replication * Object.values(querySets).flatMap(qs => qs).length;
-      const refreshExecutions = replication * Object.keys(querySets).length;
-      expect(fetch).toHaveBeenCalledTimes(queryExecutions + refreshExecutions);
+      const invalidateExecutions = replication * Object.keys(querySets).length;
+      expect(fetch).toHaveBeenCalledTimes(queryExecutions + invalidateExecutions);
       const lastCall = jest.mocked(fetch).mock.calls.at(-1);
       expect(lastCall?.[0]).toBe(endpoint);
       expect(lastCall?.[1]).toMatchObject({ method: 'GET' });

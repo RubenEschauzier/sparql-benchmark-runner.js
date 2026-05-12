@@ -68,7 +68,7 @@ Options:
   --outputRaw    Destination for the raw JSON output file                 [string]
   --metadata     Load query metadata files (*.metadata.json) and enable
                  sequence aggregation                   [boolean] [default: false]
-  --refreshAfterQuerySet  Send a cache refresh request after each query set
+  --invalidateCacheAfterQuerySet  Send a cache invalidation request after each query set
                  execution                              [boolean] [default: false]
   --timeout      Timeout value in seconds to use for individual queries [number]
   ----help
@@ -126,8 +126,8 @@ async function executeQueries(pathToQueries, pathToOutputCsv) {
 
 To enable sequence metadata from the CLI, add `--metadata`. Raw JSON output is
 only written when `--outputRaw` is provided, or automatically to
-`./output-raw.json` when `--metadata` is enabled. Cache refresh requests are
-disabled by default and can be enabled with `--refreshAfterQuerySet`.
+`./output-raw.json` when `--metadata` is enabled. Cache invalidation requests are
+disabled by default and can be enabled with `--invalidateCacheAfterQuerySet`.
 
 ## Docker
 
