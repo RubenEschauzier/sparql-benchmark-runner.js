@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+<a name="v5.1.0"></a>
+## [v5.1.0](https://github.com/comunica/sparql-benchmark-runner.js/compare/v5.0.1...v5.1.0) - 2026-05-12
+
+### Added
+* [Add support for running query sequences (#14)](https://github.com/comunica/sparql-benchmark-runner.js/commit/f777bc50bce7b5539577fe5a2a1073ccca632c0b)
+
 <a name="v5.0.1"></a>
 ## [v5.0.1](https://github.com/comunica/sparql-benchmark-runner.js/compare/v5.0.0...v5.0.1) - 2025-09-12
 
