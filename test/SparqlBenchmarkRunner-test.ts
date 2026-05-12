@@ -82,6 +82,7 @@ describe('SparqlBenchmarkRunner', () => {
       });
 
       const results = await runner.run();
+      const resultsRaw = await runner.runWithRawResults();
 
       const expectedResults: IAggregateResult[] = [
         {
@@ -178,12 +179,23 @@ describe('SparqlBenchmarkRunner', () => {
         },
       ];
 
-      // Calls: (warmup + replication) * queryset size
-      const expectedCalls = Object.values(querySets).flatMap(qs => qs).length * (replication + warmup);
+      // Calls: (warmup + replication) * queryset size * 2 (accounting for both test executions)
+      const expectedCalls = Object.values(querySets).flatMap(qs => qs).length * (replication + warmup) * 2;
       expect(fetcher.fetchBindings).toHaveBeenCalledTimes(expectedCalls);
       expect(fetch).toHaveBeenCalledTimes(expectedCalls);
 
+      // Validate run()
+      expect(Array.isArray(results)).toBe(true);
+      expect((<{ rawResults?: any }><unknown>results).rawResults).toBeUndefined();
       expect(results).toEqual(expectedResults);
+
+      // Validate runWithRawResults() structure and lengths
+      expect(resultsRaw).toHaveProperty('aggregateResults');
+      expect(resultsRaw).toHaveProperty('rawResults');
+      expect(Array.isArray(resultsRaw.aggregateResults)).toBe(true);
+      expect(Array.isArray(resultsRaw.rawResults)).toBe(true);
+      expect(resultsRaw.aggregateResults).toHaveLength(expectedResults.length);
+      expect(resultsRaw.rawResults).toHaveLength(Object.values(querySets).flatMap(qs => qs).length * replication);
     });
 
     it('waits until endpoint is up', async() => {
@@ -314,6 +326,21 @@ describe('SparqlBenchmarkRunner', () => {
     });
 
     it('handles valid queries with metadata', async() => {
+      runner = new SparqlBenchmarkRunner({
+        endpoint,
+        querySets,
+        querySetsMetadata: {
+          a: [
+            {
+              template: 'template-a',
+              sequenceElement: { template: 'template-a', position: 0 },
+            },
+          ],
+        },
+        replication,
+        warmup,
+        logger,
+      });
       jest.spyOn(fetcher, 'fetchBindings').mockImplementation(async() => {
         const stream = streamifyArray([ ...mockedResult ]);
         stream.on('newListener', () => {
@@ -333,6 +360,8 @@ describe('SparqlBenchmarkRunner', () => {
           hash: mockedResultHash,
           timestamps: [ 3, 4, 5 ],
           httpRequests: 6,
+          template: 'template-a',
+          sequenceElement: { template: 'template-a', position: 0 },
         },
         {
           time: 13,
@@ -351,6 +380,8 @@ describe('SparqlBenchmarkRunner', () => {
           hash: mockedResultHash,
           timestamps: [ 17, 18, 19 ],
           httpRequests: 34,
+          template: 'template-a',
+          sequenceElement: { template: 'template-a', position: 0 },
         },
         {
           time: 27,
@@ -407,6 +438,65 @@ describe('SparqlBenchmarkRunner', () => {
       }
 
       expect(results).toEqual(expectedResults);
+    });
+
+    it('handles partial query metadata', async() => {
+      runner = new SparqlBenchmarkRunner({
+        endpoint,
+        querySets,
+        querySetsMetadata: {
+          a: [
+            {
+              template: 'template-a',
+              sequenceElement: { template: 'template-a', position: 0 },
+            },
+          ],
+        },
+        replication,
+        warmup,
+        logger,
+      });
+
+      const results = await runner.executeAllQueries(replication, false);
+
+      expect(results[0]).toMatchObject({
+        name: 'a',
+        id: '0',
+        template: 'template-a',
+        sequenceElement: { template: 'template-a', position: 0 },
+      });
+      expect(results[1]).toMatchObject({
+        name: 'a',
+        id: '1',
+      });
+      expect(results[1]).not.toHaveProperty('template');
+      expect(results[4]).toMatchObject({
+        name: 'b',
+        id: '0',
+      });
+      expect(results[4]).not.toHaveProperty('template');
+    });
+
+    it('sends cache invalidation requests only when enabled', async() => {
+      runner = new SparqlBenchmarkRunner({
+        endpoint,
+        querySets,
+        replication,
+        warmup,
+        logger,
+        invalidateCacheBetweenSetExecutions: true,
+      });
+
+      await runner.executeAllQueries(replication, false);
+
+      const queryExecutions = replication * Object.values(querySets).flatMap(qs => qs).length;
+      const invalidateExecutions = replication * Object.keys(querySets).length;
+      expect(fetch).toHaveBeenCalledTimes(queryExecutions + invalidateExecutions);
+      const lastCall = jest.mocked(fetch).mock.calls.at(-1);
+      expect(lastCall?.[0]).toBe(endpoint);
+      expect(lastCall?.[1]).toMatchObject({ method: 'GET' });
+      expect(lastCall?.[1]?.headers).toBeInstanceOf(Headers);
+      expect((<Headers> lastCall?.[1]?.headers).get('x-comunica-refresh-cache')).toBe('true');
     });
 
     it('handles valid queries when a timeout is configured', async() => {
@@ -1112,6 +1202,55 @@ describe('SparqlBenchmarkRunner', () => {
       expect(logger).toHaveBeenNthCalledWith(1, 'Executing 2 query sets, containing 4 queries, with replication of 2');
       expect(logger).toHaveBeenNthCalledWith(2, 'Execute: 1 / 8 <a#0>');
       expect(logger).toHaveBeenNthCalledWith(3, `${expectedError.name}: ${expectedError.message}`);
+    });
+  });
+
+  describe('attachMetadataToResults', () => {
+    it('attaches metadata when present', () => {
+      expect(runner.attachMetadataToResults([
+        {
+          name: 'a',
+          id: '0',
+          results: 1,
+          hash: 'hash-a',
+          time: 10,
+          timestamps: [ 1 ],
+        },
+      ], [
+        { template: 'template-a' },
+      ])).toEqual([
+        {
+          name: 'a',
+          id: '0',
+          results: 1,
+          hash: 'hash-a',
+          time: 10,
+          timestamps: [ 1 ],
+          template: 'template-a',
+        },
+      ]);
+    });
+
+    it('returns shallow copies when metadata is absent', () => {
+      expect(runner.attachMetadataToResults([
+        {
+          name: 'a',
+          id: '0',
+          results: 1,
+          hash: 'hash-a',
+          time: 10,
+          timestamps: [ 1 ],
+        },
+      ])).toEqual([
+        {
+          name: 'a',
+          id: '0',
+          results: 1,
+          hash: 'hash-a',
+          time: 10,
+          timestamps: [ 1 ],
+        },
+      ]);
     });
   });
 

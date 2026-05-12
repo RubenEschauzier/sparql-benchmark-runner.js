@@ -6,16 +6,8 @@ import { QueryLoaderFile } from '../lib/QueryLoaderFile';
 
 const queryFilesPath = '/tmp/queries';
 
-const queryFiles: Record<string, string> = {
-  'a.rq': 'A',
-  'b.sparql': 'B1\n\nB2\n\n\n\n',
-  'c.txt': 'C',
-  'd.json': 'D',
-  'dir/': 'true',
-};
-const queryFilesSub: Record<string, string> = {
-  'e.sparql': 'E',
-};
+let queryFiles: Record<string, string>;
+let queryFilesSub: Record<string, string>;
 
 jest.mock<typeof fsPromises>('node:fs/promises', () => <typeof fsPromises> <unknown> ({
   async readdir(path: string): Promise<Dirent[]> {
@@ -56,6 +48,16 @@ describe('QueryLoader', () => {
   let loader: IQueryLoader;
 
   beforeEach(() => {
+    queryFiles = {
+      'a.rq': 'A',
+      'b.sparql': 'B1\n\nB2\n\n\n\n',
+      'c.txt': 'C',
+      'd.json': 'D',
+      'dir/': 'true',
+    };
+    queryFilesSub = {
+      'e.sparql': 'E',
+    };
     loader = new QueryLoaderFile({ path: queryFilesPath });
   });
 
@@ -68,5 +70,55 @@ describe('QueryLoader', () => {
       'dir/e': [ 'E' ],
     };
     expect(queries).toEqual(queriesExpected);
+  });
+
+  it('should ignore non-metadata json files', async() => {
+    await expect(loader.loadQueriesMetadata()).resolves.toEqual({});
+  });
+
+  it('should load query metadata from metadata files', async() => {
+    queryFiles['a.metadata.json'] = JSON.stringify({
+      template: 'template-a',
+      provenance: 'dataset-a',
+      sequenceElements: [
+        { position: 0 },
+        { position: 1 },
+      ],
+    });
+    queryFilesSub['e.metadata.json'] = JSON.stringify({
+      template: 'template-e',
+      sequenceElements: [
+        { position: 2 },
+      ],
+    });
+
+    await expect(loader.loadQueriesMetadata()).resolves.toEqual({
+      a: [
+        {
+          template: 'template-a',
+          provenance: 'dataset-a',
+          sequenceElement: { position: 0 },
+        },
+        {
+          template: 'template-a',
+          provenance: 'dataset-a',
+          sequenceElement: { position: 1 },
+        },
+      ],
+      'dir/e': [
+        {
+          template: 'template-e',
+          sequenceElement: { position: 2 },
+        },
+      ],
+    });
+  });
+
+  it('should reject invalid metadata files', async() => {
+    queryFiles['a.metadata.json'] = JSON.stringify({
+      template: 'template-a',
+    });
+
+    await expect(loader.loadQueriesMetadata()).rejects.toThrow('queries metadata has no array entry');
   });
 });

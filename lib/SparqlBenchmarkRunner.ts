@@ -2,7 +2,8 @@ import { createHash, type Hash } from 'node:crypto';
 import type * as RDF from '@rdfjs/types';
 import { SparqlEndpointFetcher } from 'fetch-sparql-endpoint';
 import { termToString } from 'rdf-string';
-import type { IResult, IResultMetadata, IAggregateResult } from './Result';
+import type { IQuerySetMetadata } from './QueryLoader';
+import type { IAggregateResult, IResult, IResultMetadata, IRunResult } from './Result';
 import type { IResultAggregator } from './ResultAggregator';
 import { ResultAggregatorComunica } from './ResultAggregatorComunica';
 
@@ -17,10 +18,12 @@ export class SparqlBenchmarkRunner {
   protected readonly replication: number;
   protected readonly warmup: number;
   protected readonly querySets: Record<string, string[]>;
+  protected readonly querySetsMetadata?: Record<string, IQuerySetMetadata>;
   protected readonly bindingsHashAlgorithm: string;
   protected readonly logger?: (message: string) => void;
   protected readonly resultAggregator: IResultAggregator;
   protected readonly availabilityCheckTimeout: number;
+  protected readonly invalidateCacheBetweenSetExecutions: boolean;
   public readonly endpointFetcher: SparqlEndpointFetcher;
 
   public constructor(options: ISparqlBenchmarkRunnerArgs) {
@@ -29,12 +32,14 @@ export class SparqlBenchmarkRunner {
     this.endpoint = options.endpoint;
     this.endpointUpCheck = options.endpointUpCheck ?? options.endpoint;
     this.querySets = options.querySets;
+    this.querySetsMetadata = options.querySetsMetadata;
     this.replication = options.replication;
     this.warmup = options.warmup;
     this.timeout = options.timeout;
     this.requestDelay = options.requestDelay;
     this.bindingsHashAlgorithm = 'md5';
     this.availabilityCheckTimeout = options.availabilityCheckTimeout ?? 10_000;
+    this.invalidateCacheBetweenSetExecutions = options.invalidateCacheBetweenSetExecutions ?? false;
     this.endpointFetcher = new SparqlEndpointFetcher({
       additionalUrlParams: options.additionalUrlParams,
       timeout: options.timeout,
@@ -47,6 +52,14 @@ export class SparqlBenchmarkRunner {
    * Afterwards, all results are collected and averaged.
    */
   public async run(options: IRunOptions = {}): Promise<IAggregateResult[]> {
+    const result = await this.runWithRawResults(options);
+    return result.aggregateResults;
+  }
+
+  /**
+   * Runs the queries and return aggregated and raw results
+   */
+  public async runWithRawResults(options: IRunOptions = {}): Promise<IRunResult> {
     // Execute queries in warmup
     if (this.warmup > 0) {
       await this.executeAllQueries(this.warmup, true, options.onQuery);
@@ -65,7 +78,10 @@ export class SparqlBenchmarkRunner {
 
     const aggregateResults = this.resultAggregator.aggregateResults(results);
 
-    return aggregateResults;
+    return {
+      aggregateResults,
+      rawResults: results,
+    };
   }
 
   /**
@@ -73,7 +89,7 @@ export class SparqlBenchmarkRunner {
    * @param replication The number of executions per individual query.
    * @param warmup Whether the executions are intended for warmup purposes only.
    * @param onQuery Callback for when a query is about to be executed.
-   * @returns The query reults, unless warmup is specified.
+   * @returns The query results, unless warmup is specified.
    */
   public async executeAllQueries(
     replication: number,
@@ -98,19 +114,43 @@ export class SparqlBenchmarkRunner {
       for (let i = 0; i < replication; i++) {
         for (const [ id, queryString ] of queryStrings.entries()) {
           this.log(`Execute: ${(++finishedExecutions).toString().padStart(totalExecutions.length, ' ')} / ${totalExecutions} <${name}#${id}>`);
+
           await this.waitForEndpoint();
+
           if (this.requestDelay) {
             await this.sleep(this.requestDelay);
           }
           if (onQuery) {
             await onQuery(queryString);
           }
-          const result = await this.executeQuery(name, id.toString(), queryString);
+
+          let result = await this.executeQuery(name, id.toString(), queryString);
+
+          const querySetMetadata = this.querySetsMetadata?.[name];
+          const queryMetadata = querySetMetadata?.[id];
+          if (queryMetadata) {
+            result = { ...result, ...queryMetadata };
+          }
           if (!warmup) {
             results.push(result);
           }
           if (this.requestDelay) {
             await this.sleep(this.requestDelay);
+          }
+        }
+
+        // Trigger the worker restart after completing the query set execution
+        if (this.invalidateCacheBetweenSetExecutions) {
+          this.log(`Sending cache invalidation signal to trigger worker restart.`);
+          try {
+            const invalidationHeaders = new Headers();
+            invalidationHeaders.set('x-comunica-refresh-cache', 'true');
+            await fetch(this.endpoint, {
+              method: 'GET',
+              headers: invalidationHeaders,
+            });
+          } catch {
+            // Suppress error: The server terminates the connection forcefully during shutdown.
           }
         }
       }
@@ -185,6 +225,13 @@ export class SparqlBenchmarkRunner {
     result.hash = bindingsHash.digest('hex');
 
     return result;
+  }
+
+  public attachMetadataToResults(results: IResult[], metadatas?: IQuerySetMetadata): IResult[] {
+    return results.map((result, i) => {
+      const metadata = metadatas?.[i];
+      return metadata ? { ...result, ...metadata } : { ...result };
+    });
   }
 
   /**
@@ -272,6 +319,10 @@ export interface ISparqlBenchmarkRunnerArgs {
    */
   querySets: Record<string, string[]>;
   /**
+   * Mapping of query set name to array of JSON metadata objects
+   */
+  querySetsMetadata?: Record<string, IQuerySetMetadata>;
+  /**
    * Number of replication runs.
    */
   replication: number;
@@ -305,6 +356,10 @@ export interface ISparqlBenchmarkRunnerArgs {
    * A timeout in milliseconds for checking whether the SPARQL endpoint is up.
    */
   availabilityCheckTimeout?: number;
+  /**
+   * If the engine should reset the cache between executions
+   */
+  invalidateCacheBetweenSetExecutions?: boolean;
   /**
    * The delay between subsequent requests sent to the server.
    */

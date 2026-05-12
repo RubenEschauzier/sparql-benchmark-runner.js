@@ -59,3 +59,11 @@ export interface IAggregateResult extends IResult {
   // Raw timestamps for all repetitions, preserving individual result arrival times.
   timestampsAll: number[][];
 }
+
+export interface IRunResult {
+  // Aggregated result of the run
+  aggregateResults: IAggregateResult[];
+
+  // Optional raw results of the run
+  rawResults?: IResult[];
+}
