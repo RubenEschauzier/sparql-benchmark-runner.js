@@ -82,6 +82,7 @@ describe('SparqlBenchmarkRunner', () => {
       });
 
       const results = await runner.run();
+      const resultsRaw = await runner.runWithRawResults();
 
       const expectedResults: IAggregateResult[] = [
         {
@@ -178,15 +179,23 @@ describe('SparqlBenchmarkRunner', () => {
         },
       ];
 
-      // Calls: (warmup + replication) * queryset size
-      const expectedCalls = Object.values(querySets).flatMap(qs => qs).length * (replication + warmup);
+      // Calls: (warmup + replication) * queryset size * 2 (accounting for both test executions)
+      const expectedCalls = Object.values(querySets).flatMap(qs => qs).length * (replication + warmup) * 2;
       expect(fetcher.fetchBindings).toHaveBeenCalledTimes(expectedCalls);
       expect(fetch).toHaveBeenCalledTimes(expectedCalls);
 
-      expect(Array.isArray(results)).toBe(false);
-      expect((<{ 0?: IAggregateResult }><unknown>results)[0]).toBeUndefined();
-      expect(results.aggregateResults).toEqual(expectedResults);
-      expect(results.rawResults).toHaveLength(Object.values(querySets).flatMap(qs => qs).length * replication);
+      // Validate run()
+      expect(Array.isArray(results)).toBe(true);
+      expect((<{ rawResults?: any }><unknown>results).rawResults).toBeUndefined();
+      expect(results).toEqual(expectedResults);
+
+      // Validate runWithRawResults() structure and lengths
+      expect(resultsRaw).toHaveProperty('aggregateResults');
+      expect(resultsRaw).toHaveProperty('rawResults');
+      expect(Array.isArray(resultsRaw.aggregateResults)).toBe(true);
+      expect(Array.isArray(resultsRaw.rawResults)).toBe(true);
+      expect(resultsRaw.aggregateResults).toHaveLength(expectedResults.length);
+      expect(resultsRaw.rawResults).toHaveLength(Object.values(querySets).flatMap(qs => qs).length * replication);
     });
 
     it('waits until endpoint is up', async() => {

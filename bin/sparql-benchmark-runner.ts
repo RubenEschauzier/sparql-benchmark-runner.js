@@ -110,7 +110,7 @@ async function main(): Promise<void> {
     invalidateCacheBetweenSetExecutions: args.invalidateCacheAfterQuerySet,
   });
 
-  const results: IRunResult = await runner.run();
+  const results: IRunResult = await runner.runWithRawResults();
   await serializeResults(args.output, results.aggregateResults);
   const outputRaw = args.outputRaw ?? (args.metadata ? resolve('./output-raw.json') : undefined);
   if (results.rawResults && outputRaw) {

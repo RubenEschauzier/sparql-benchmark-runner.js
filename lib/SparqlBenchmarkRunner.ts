@@ -3,7 +3,7 @@ import type * as RDF from '@rdfjs/types';
 import { SparqlEndpointFetcher } from 'fetch-sparql-endpoint';
 import { termToString } from 'rdf-string';
 import type { IQuerySetMetadata } from './QueryLoader';
-import type { IResult, IResultMetadata, IRunResult } from './Result';
+import type { IAggregateResult, IResult, IResultMetadata, IRunResult } from './Result';
 import type { IResultAggregator } from './ResultAggregator';
 import { ResultAggregatorComunica } from './ResultAggregatorComunica';
 
@@ -51,7 +51,15 @@ export class SparqlBenchmarkRunner {
    * execute all query sets against the SPARQL endpoint.
    * Afterwards, all results are collected and averaged.
    */
-  public async run(options: IRunOptions = {}): Promise<IRunResult> {
+  public async run(options: IRunOptions = {}): Promise<IAggregateResult[]> {
+    const result = await this.runWithRawResults(options);
+    return result.aggregateResults;
+  }
+
+  /**
+   * Runs the queries and return aggregated and raw results
+   */
+  public async runWithRawResults(options: IRunOptions = {}): Promise<IRunResult> {
     // Execute queries in warmup
     if (this.warmup > 0) {
       await this.executeAllQueries(this.warmup, true, options.onQuery);
