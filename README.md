@@ -53,6 +53,9 @@ npm install sparql-benchmark-runner
 ```
 
 ## Usage
+
+### Command Line Interface (CLI)
+
 `sparql-benchmark-runner` can be used from the CLI with the the following options.
 
 ```
@@ -83,6 +86,8 @@ sparql-benchmark-runner \
   --replication 5 \
   --warmup 1
 ```
+
+### As a JavaScript Library
 
 When used as a JavaScript library, the runner can be configured with different query loaders,
 result aggregators and result serializers to accommodate special use cases.
@@ -123,6 +128,8 @@ async function executeQueries(pathToQueries, pathToOutputCsv) {
   await resultSerializer.serialize(pathToOutputCsv, results.aggregateResults);
 }
 ```
+
+### Sequence Metadata
 
 To enable sequence metadata from the CLI, add `--metadata`. Raw JSON output is
 only written when `--outputRaw` is provided, or automatically to
